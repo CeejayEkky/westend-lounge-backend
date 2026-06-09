@@ -1,8 +1,19 @@
 // server/utils/email.js
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
-// Initialize Resend with your API key
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Create transporter for Brevo SMTP
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+  port: parseInt(process.env.SMTP_PORT) || 587,
+  secure: false, // false for port 587
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+  tls: {
+    rejectUnauthorized: false
+  }
+});
 
 // Send reservation confirmation to CUSTOMER
 const sendReservationConfirmation = async (reservation) => {
@@ -20,9 +31,9 @@ const sendReservationConfirmation = async (reservation) => {
   console.log('📧 Sending reservation confirmation to:', reservation.customer_email);
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'Westend Lounge <onboarding@resend.dev>', // Use Resend's default domain for testing
-      to: [reservation.customer_email],
+    const info = await transporter.sendMail({
+      from: `"Westend Lounge" <${process.env.EMAIL_USER}>`,
+      to: reservation.customer_email,
       subject: `Reservation Confirmation - Westend Lounge`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px;">
@@ -56,11 +67,8 @@ const sendReservationConfirmation = async (reservation) => {
       `,
     });
 
-    if (error) {
-      console.error('❌ Resend error:', error);
-    } else {
-      console.log(`✅ Reservation confirmation sent to ${reservation.customer_email}`);
-    }
+    console.log(`✅ Reservation confirmation sent to ${reservation.customer_email}`);
+    console.log(`📧 Message ID: ${info.messageId}`);
   } catch (error) {
     console.error('❌ Failed to send reservation email:', error.message);
   }
@@ -71,9 +79,9 @@ const sendOrderConfirmation = async (order) => {
   console.log('📧 Sending order confirmation to:', order.customer_email);
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'Westend Lounge <onboarding@resend.dev>',
-      to: [order.customer_email],
+    await transporter.sendMail({
+      from: `"Westend Lounge" <${process.env.EMAIL_USER}>`,
+      to: order.customer_email,
       subject: `Order Confirmation #${order.order_id}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px;">
@@ -91,11 +99,7 @@ const sendOrderConfirmation = async (order) => {
       `,
     });
 
-    if (error) {
-      console.error('❌ Resend error:', error);
-    } else {
-      console.log(`✅ Order confirmation sent to ${order.customer_email}`);
-    }
+    console.log(`✅ Order confirmation sent to ${order.customer_email}`);
   } catch (error) {
     console.error('❌ Failed to send order email:', error.message);
   }
@@ -115,9 +119,9 @@ const sendOrderStatusUpdate = async (order, newStatus) => {
   console.log('📧 Sending status update to:', order.customer_email);
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'Westend Lounge <onboarding@resend.dev>',
-      to: [order.customer_email],
+    await transporter.sendMail({
+      from: `"Westend Lounge" <${process.env.EMAIL_USER}>`,
+      to: order.customer_email,
       subject: `Order Update #${order.order_id}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px;">
@@ -130,11 +134,7 @@ const sendOrderStatusUpdate = async (order, newStatus) => {
       `,
     });
 
-    if (error) {
-      console.error('❌ Resend error:', error);
-    } else {
-      console.log(`✅ Status update sent to ${order.customer_email}`);
-    }
+    console.log(`✅ Status update sent to ${order.customer_email}`);
   } catch (error) {
     console.error('❌ Failed to send status email:', error.message);
   }
@@ -142,31 +142,39 @@ const sendOrderStatusUpdate = async (order, newStatus) => {
 
 // Send notification to ADMIN (new reservation alert)
 const sendAdminReservationAlert = async (reservation) => {
-  console.log('📧 Attempting to send admin alert...');
+  const formattedDateTime = new Date(reservation.reservation_date).toLocaleString();
   
-  // Skip if no admin email
+  console.log('📧 Sending admin alert to:', process.env.ADMIN_EMAIL);
+  
   if (!process.env.ADMIN_EMAIL) {
     console.log('⚠️ No ADMIN_EMAIL set, skipping admin alert');
     return;
   }
   
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'Westend Lounge <onboarding@resend.dev>',
-      to: [process.env.ADMIN_EMAIL],
-      subject: '🆕 New Table Reservation',
-      html: `...`,
+    await transporter.sendMail({
+      from: `"Westend Lounge Admin" <${process.env.EMAIL_USER}>`,
+      to: process.env.ADMIN_EMAIL,
+      subject: '🆕 New Table Reservation Alert',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px;">
+          <h2 style="color: #FFD700;">New Reservation! 🆕</h2>
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 10px; margin: 15px 0;">
+            <p><strong>👤 Customer:</strong> ${reservation.customer_name}</p>
+            <p><strong>📧 Email:</strong> ${reservation.customer_email}</p>
+            <p><strong>📱 Phone:</strong> ${reservation.customer_phone}</p>
+            <p><strong>📅 Date & Time:</strong> ${formattedDateTime}</p>
+            <p><strong>👥 Guests:</strong> ${reservation.guests}</p>
+            <p><strong>📝 Special Requests:</strong> ${reservation.special_requests || 'None'}</p>
+          </div>
+          <p>Login to <a href="${process.env.FRONTEND_URL}/admin">admin dashboard</a> to manage.</p>
+        </div>
+      `,
     });
 
-    if (error) {
-      console.log('⚠️ Admin email not sent (Resend restriction):', error.message);
-      console.log('💡 To send real emails, verify a domain in Resend dashboard');
-    } else {
-      console.log(`✅ Admin alert sent`);
-    }
+    console.log(`✅ Admin alert sent for reservation ${reservation.id}`);
   } catch (error) {
-    console.log('⚠️ Admin email skipped:', error.message);
-    // Don't throw - reservation still works
+    console.log('⚠️ Admin email failed:', error.message);
   }
 };
 
