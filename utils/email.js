@@ -142,38 +142,31 @@ const sendOrderStatusUpdate = async (order, newStatus) => {
 
 // Send notification to ADMIN (new reservation alert)
 const sendAdminReservationAlert = async (reservation) => {
-  const formattedDate = new Date(reservation.reservation_date).toLocaleString();
-
-  console.log('📧 Sending admin alert to:', process.env.ADMIN_EMAIL);
-
+  console.log('📧 Attempting to send admin alert...');
+  
+  // Skip if no admin email
+  if (!process.env.ADMIN_EMAIL) {
+    console.log('⚠️ No ADMIN_EMAIL set, skipping admin alert');
+    return;
+  }
+  
   try {
     const { data, error } = await resend.emails.send({
       from: 'Westend Lounge <onboarding@resend.dev>',
-      to: [process.env.ADMIN_EMAIL || 'admin@westendloungebar.com'],
+      to: [process.env.ADMIN_EMAIL],
       subject: '🆕 New Table Reservation',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px;">
-          <h2 style="color: #FFD700;">New Reservation Alert! 🆕</h2>
-          <div style="background: #f5f5f5; padding: 15px; border-radius: 10px; margin: 15px 0;">
-            <p><strong>👤 Customer:</strong> ${reservation.customer_name}</p>
-            <p><strong>📧 Email:</strong> ${reservation.customer_email}</p>
-            <p><strong>📱 Phone:</strong> ${reservation.customer_phone}</p>
-            <p><strong>📅 Date & Time:</strong> ${formattedDate}</p>
-            <p><strong>👥 Guests:</strong> ${reservation.guests}</p>
-            <p><strong>📝 Special Requests:</strong> ${reservation.special_requests || 'None'}</p>
-          </div>
-          <p>Login to <a href="${process.env.FRONTEND_URL}/admin">admin dashboard</a> to manage.</p>
-        </div>
-      `,
+      html: `...`,
     });
 
     if (error) {
-      console.error('❌ Resend error:', error);
+      console.log('⚠️ Admin email not sent (Resend restriction):', error.message);
+      console.log('💡 To send real emails, verify a domain in Resend dashboard');
     } else {
-      console.log(`✅ Admin alert sent for reservation ${reservation.id}`);
+      console.log(`✅ Admin alert sent`);
     }
   } catch (error) {
-    console.error('❌ Failed to send admin alert:', error.message);
+    console.log('⚠️ Admin email skipped:', error.message);
+    // Don't throw - reservation still works
   }
 };
 

@@ -42,6 +42,8 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'))
 }
 
+app.set('trust proxy', 1); 
+
 // ── Rate limiting ─────────────────────────────────────────────────────────────
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
