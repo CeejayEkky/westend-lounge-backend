@@ -67,26 +67,20 @@ const createReservation = async (req, res) => {
     
     console.log('✅ Reservation created:', data.id);
     
-    // Send confirmation email to customer
-    try {
-      await sendReservationConfirmation(data);
-      console.log('✅ Confirmation email sent to customer');
-    } catch (emailError) {
-      console.error('❌ Customer email failed (non-critical):', emailError.message);
-    }
-    
-    // Send notification email to admin
-    try {
-      await sendAdminReservationAlert(data);
-      console.log('✅ Admin alert sent');
-    } catch (emailError) {
-      console.error('❌ Admin email failed (non-critical):', emailError.message);
-    }
-    
+    // ✅ SEND RESPONSE IMMEDIATELY - Customer gets instant feedback
     res.status(201).json({ 
       success: true, 
       message: 'Reservation created successfully! Check your email for confirmation.',
       data 
+    });
+    
+    // ✅ Send emails in BACKGROUND (don't make customer wait)
+    // Customer won't see any delay from this
+    Promise.all([
+      sendReservationConfirmation(data).catch(err => console.error('❌ Customer email failed:', err.message)),
+      sendAdminReservationAlert(data).catch(err => console.error('❌ Admin email failed:', err.message))
+    ]).then(() => {
+      console.log('📧 Both email attempts completed for reservation:', data.id);
     });
     
   } catch (error) {
