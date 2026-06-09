@@ -5,7 +5,7 @@ const { register, login, logout, getMe } = require('../controllers/authControlle
 const { createOrder, getOrder, getAllOrders, updateOrderStatus, deleteOrder } = require('../controllers/orderController')
 const { verifyPayment, webhook, checkPaymentStatus } = require('../controllers/paymentController')
 const { getMenu, getMenuItem, createMenuItem, updateMenuItem, deleteMenuItem } = require('../controllers/menuController')
-const { createReservation, getAllReservations, updateReservationStatus } = require('../controllers/reservationController')
+const { createReservation, getAllReservations, updateReservationStatus, deleteReservation } = require('../controllers/reservationController')
 const { getStats } = require('../controllers/adminController')
 const { protect, adminOnly, optionalAuth } = require('../middleware/auth')
 const { 
@@ -44,6 +44,7 @@ router.get('/payments/status/:order_id', checkPaymentStatus);                  /
 router.post('/reservations', optionalAuth, createReservation)
 router.get('/reservations/admin/all', protect, adminOnly, getAllReservations)
 router.put('/reservations/:id/status', protect, adminOnly, updateReservationStatus)
+router.delete('/reservations/:id', protect, adminOnly, deleteReservation);
 
 // Admin routes
 router.get('/admin/stats', protect, adminOnly, getAdminStats);

@@ -205,7 +205,29 @@ const cancelReservation = async (req, res) => {
   }
 };
 
+// Delete reservation (admin only)
+const deleteReservation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const { error } = await supabase
+      .from('reservations')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      return res.status(404).json({ success: false, message: 'Reservation not found' });
+    }
+    
+    res.json({ success: true, message: 'Reservation deleted successfully' });
+  } catch (error) {
+    console.error('Delete error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 module.exports = { 
+  deleteReservation,
   createReservation, 
   getAllReservations, 
   updateReservationStatus,
