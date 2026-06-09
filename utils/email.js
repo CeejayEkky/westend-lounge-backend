@@ -1,33 +1,28 @@
 // server/utils/email.js
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// Initialize Resend with your API key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Send reservation confirmation to customer
+// Send reservation confirmation to CUSTOMER
 const sendReservationConfirmation = async (reservation) => {
-  try {
-    const formattedDate = new Date(reservation.reservation_date).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-    const formattedTime = new Date(reservation.reservation_date).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const formattedDate = new Date(reservation.reservation_date).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  const formattedTime = new Date(reservation.reservation_date).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 
-    await transporter.sendMail({
-      from: `"Westend Lounge" <${process.env.EMAIL_USER}>`,
-      to: reservation.customer_email,
+  console.log('📧 Sending reservation confirmation to:', reservation.customer_email);
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'Westend Lounge <onboarding@resend.dev>', // Use Resend's default domain for testing
+      to: [reservation.customer_email],
       subject: `Reservation Confirmation - Westend Lounge`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px;">
@@ -51,8 +46,7 @@ const sendReservationConfirmation = async (reservation) => {
             <li>Live band starts at 8 PM on Fridays & Saturdays</li>
           </ul>
           
-          <p>To cancel or modify your reservation, please contact us at +234 803 722 7263.</p>
-          
+          <p>To cancel or modify, please contact us at +234 803 722 7263.</p>
           <br/>
           <p>We look forward to serving you!</p>
           <p><strong>Westend Lounge Team</strong> ❤️</p>
@@ -61,22 +55,25 @@ const sendReservationConfirmation = async (reservation) => {
         </div>
       `,
     });
-    console.log(`✅ Reservation confirmation sent to ${reservation.customer_email}`);
+
+    if (error) {
+      console.error('❌ Resend error:', error);
+    } else {
+      console.log(`✅ Reservation confirmation sent to ${reservation.customer_email}`);
+    }
   } catch (error) {
-    console.error('❌ Reservation confirmation email failed:', error.message);
+    console.error('❌ Failed to send reservation email:', error.message);
   }
 };
 
-// Send order confirmation to customer
+// Send order confirmation to CUSTOMER
 const sendOrderConfirmation = async (order) => {
-  try {
-    const itemsList = order.order_items.map(item => 
-      `${item.name} x ${item.quantity} - ₦${(item.price * item.quantity).toLocaleString()}`
-    ).join('\n');
+  console.log('📧 Sending order confirmation to:', order.customer_email);
 
-    await transporter.sendMail({
-      from: `"Westend Lounge" <${process.env.EMAIL_USER}>`,
-      to: order.customer_email,
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'Westend Lounge <onboarding@resend.dev>',
+      to: [order.customer_email],
       subject: `Order Confirmation #${order.order_id}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px;">
@@ -87,43 +84,40 @@ const sendOrderConfirmation = async (order) => {
             ${order.order_items.map(item => `<li>${item.name} x ${item.quantity} - ₦${(item.price * item.quantity).toLocaleString()}</li>`).join('')}
           </ul>
           <p><strong>Total:</strong> ₦${order.total_amount.toLocaleString()}</p>
-          <p>Track your order here: <a href="${process.env.FRONTEND_URL}/track-order/${order.order_id}">Track Order</a></p>
-          <p>We'll notify you when your order is ready.</p>
+          <p>Track your order: <a href="${process.env.FRONTEND_URL}/track-order/${order.order_id}">Click here</a></p>
           <br/>
           <p>Westend Lounge – 139 Akowonjo Road, Lagos</p>
         </div>
       `,
     });
-    console.log(`✅ Order confirmation sent to ${order.customer_email}`);
+
+    if (error) {
+      console.error('❌ Resend error:', error);
+    } else {
+      console.log(`✅ Order confirmation sent to ${order.customer_email}`);
+    }
   } catch (error) {
-    console.error('❌ Email send failed:', error.message);
+    console.error('❌ Failed to send order email:', error.message);
   }
 };
 
-// Send order status update to customer
+// Send order status update to CUSTOMER
 const sendOrderStatusUpdate = async (order, newStatus) => {
+  let statusMessage = '';
+  switch(newStatus) {
+    case 'preparing': statusMessage = 'Your order is being prepared by our chefs! 🔥'; break;
+    case 'ready': statusMessage = 'Your order is ready for pickup! 🎉'; break;
+    case 'completed': statusMessage = 'Order completed! Thank you for choosing Westend! ❤️'; break;
+    case 'cancelled': statusMessage = 'Your order has been cancelled.'; break;
+    default: statusMessage = `Your order status is now: ${newStatus}`;
+  }
+
+  console.log('📧 Sending status update to:', order.customer_email);
+
   try {
-    let statusMessage = '';
-    switch(newStatus) {
-      case 'preparing':
-        statusMessage = 'Your order is being prepared by our chefs! 🔥';
-        break;
-      case 'ready':
-        statusMessage = 'Your order is ready for pickup! 🎉';
-        break;
-      case 'completed':
-        statusMessage = 'Order completed! Thank you for choosing Westend! ❤️';
-        break;
-      case 'cancelled':
-        statusMessage = 'Your order has been cancelled.';
-        break;
-      default:
-        statusMessage = `Your order status is now: ${newStatus}`;
-    }
-    
-    await transporter.sendMail({
-      from: `"Westend Lounge" <${process.env.EMAIL_USER}>`,
-      to: order.customer_email,
+    const { data, error } = await resend.emails.send({
+      from: 'Westend Lounge <onboarding@resend.dev>',
+      to: [order.customer_email],
       subject: `Order Update #${order.order_id}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px;">
@@ -135,20 +129,27 @@ const sendOrderStatusUpdate = async (order, newStatus) => {
         </div>
       `,
     });
-    console.log(`✅ Status update sent to ${order.customer_email}`);
+
+    if (error) {
+      console.error('❌ Resend error:', error);
+    } else {
+      console.log(`✅ Status update sent to ${order.customer_email}`);
+    }
   } catch (error) {
-    console.error('❌ Status email failed:', error.message);
+    console.error('❌ Failed to send status email:', error.message);
   }
 };
 
-// Send admin notification for new reservation
+// Send notification to ADMIN (new reservation alert)
 const sendAdminReservationAlert = async (reservation) => {
+  const formattedDate = new Date(reservation.reservation_date).toLocaleString();
+
+  console.log('📧 Sending admin alert to:', process.env.ADMIN_EMAIL);
+
   try {
-    const formattedDate = new Date(reservation.reservation_date).toLocaleString();
-    
-    await transporter.sendMail({
-      from: `"Westend Lounge" <${process.env.EMAIL_USER}>`,
-      to: process.env.ADMIN_EMAIL || 'admin@westendloungebar.com',
+    const { data, error } = await resend.emails.send({
+      from: 'Westend Lounge <onboarding@resend.dev>',
+      to: [process.env.ADMIN_EMAIL || 'admin@westendloungebar.com'],
       subject: '🆕 New Table Reservation',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px;">
@@ -161,15 +162,18 @@ const sendAdminReservationAlert = async (reservation) => {
             <p><strong>👥 Guests:</strong> ${reservation.guests}</p>
             <p><strong>📝 Special Requests:</strong> ${reservation.special_requests || 'None'}</p>
           </div>
-          <p>Login to <a href="${process.env.FRONTEND_URL}/admin">admin dashboard</a> to manage this reservation.</p>
-          <hr/>
-          <p style="font-size: 12px; color: #666;">Westend Lounge Admin System</p>
+          <p>Login to <a href="${process.env.FRONTEND_URL}/admin">admin dashboard</a> to manage.</p>
         </div>
       `,
     });
-    console.log(`✅ Admin alert sent for reservation ${reservation.id}`);
+
+    if (error) {
+      console.error('❌ Resend error:', error);
+    } else {
+      console.log(`✅ Admin alert sent for reservation ${reservation.id}`);
+    }
   } catch (error) {
-    console.error('❌ Admin alert failed:', error.message);
+    console.error('❌ Failed to send admin alert:', error.message);
   }
 };
 
@@ -177,5 +181,5 @@ module.exports = {
   sendReservationConfirmation,
   sendOrderConfirmation, 
   sendOrderStatusUpdate, 
-  sendAdminReservationAlert 
+  sendAdminReservationAlert
 };
