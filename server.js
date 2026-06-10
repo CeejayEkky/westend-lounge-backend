@@ -42,7 +42,7 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'))
 }
 
-app.set('trust proxy', 1) 
+app.set('trust proxy', 1)
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
 const generalLimiter = rateLimit({
